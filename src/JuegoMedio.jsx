@@ -25,6 +25,8 @@ export default function JuegoMedio() {
   const [manosGanadasMaquina, setManosGanadasMaquina] = useState(0)
   const [mostrarApartadoEnvido, setMostrarApartadoEnvido] = useState(false)
   const [empezoEnvido, setEmpezoEnvido] = useState(false)
+  const [puntosEnvidoJugador, setPuntosEnvidoJugador] = useState(0)
+  const [puntosEnvidoMaquina, setPuntosEnvidoMaquina] = useState(0)
   // banderita para evitar múltiples disparos del canto automático
 const envidoAutoTriggeredRef = useRef(false)
 
@@ -134,39 +136,47 @@ const envidoAutoTriggeredRef = useRef(false)
 
   // ==================== EFECTO MÁQUINA ====================
 
- useEffect(() => {
-  // DEBUG: comentar o borrar después de probar
-  console.log('DEBUG auto-envido:', { puntosMaquina, seCantoEnvido, empezoLaPartida, cartasJugadorLen: cartasJugador.length, yaTrigger: envidoAutoTriggeredRef.current })
-
-  const UMBRAL = 20 // lo dejás en 20 para probar; luego cambiás a 30
-  const tieneCartasRepartidas = cartasJugador.length === 3 || empezoLaPartida
+useEffect(() => {
+  // condiciones REALES para que pueda cantar
+  const tieneCartasRepartidas =
+    cartasComputadora.length === 3 &&
+    cartasJugador.length === 3 &&
+    empezoLaPartida
 
   const debeCantar =
-    puntosMaquina >= UMBRAL &&
+    puntosMaquina >= 0 &&
+    tieneCartasRepartidas &&
     !seCantoEnvido &&
-    
-    tieneCartasRepartidas
+    !envidoAutoTriggeredRef.current
 
-  if (debeCantar) {
-    envidoAutoTriggeredRef.current = true // marca que ya cantó para no repetir
-    setSeCantoEnvido(true)
+  if (!debeCantar) return
 
-    Swal.fire({
-      title: '🤖 La máquina te canta ENVIDO',
-      text: '¿Querés aceptar o rechazar?',
-      showDenyButton: true,
-      confirmButtonText: 'Aceptar',
-      denyButtonText: 'Rechazar',
-    }).then(result => {
-      if (result.isConfirmed) {
-        setMostrarApartadoEnvido(true)
-      } else if (result.isDenied) {
-        setPuntosMaquina(p => p + 1)
-        Swal.fire('Le diste 1 punto a la máquina', '', 'info')
-      }
-    })
-  }
-}, [puntosMaquina, seCantoEnvido, empezoLaPartida, cartasJugador.length])
+  // evitar dobles disparos
+  envidoAutoTriggeredRef.current = true
+  setSeCantoEnvido(true)
+
+  Swal.fire({
+    title: '🤖 La máquina te canta ENVIDO',
+    text: '¿Querés aceptar o rechazar?',
+    showDenyButton: true,
+    confirmButtonText: 'Aceptar',
+    denyButtonText: 'Rechazar',
+  }).then((result) => {
+    if (result.isConfirmed) {
+      setMostrarApartadoEnvido(true)
+    } else if (result.isDenied) {
+      setPuntosMaquina((p) => p + 1)
+      Swal.fire('Le diste 1 punto a la máquina', '', 'info')
+    }
+  })
+}, [
+  puntosMaquina,
+  empezoLaPartida,
+  cartasJugador.length,
+  cartasComputadora.length,
+  seCantoEnvido,
+])
+
 
 
   useEffect(() => {
@@ -300,26 +310,6 @@ const envidoAutoTriggeredRef = useRef(false)
   }, [cartasTiradasJugador, cartasTiradasRival])
 
   // Dispara el canto automático si la máquina ya empieza con 20 o más puntos
-useEffect(() => {
-  if (puntosMaquina >= 20 && !seCantoEnvido && !envidoAutoTriggeredRef.current) {
-    envidoAutoTriggeredRef.current = true
-    setSeCantoEnvido(true)
-    Swal.fire({
-      title: '🤖 La máquina te canta ENVIDO',
-      text: '¿Querés aceptar o rechazar?',
-      showDenyButton: true,
-      confirmButtonText: 'Aceptar',
-      denyButtonText: 'Rechazar',
-    }).then(result => {
-      if (result.isConfirmed) {
-        setMostrarApartadoEnvido(true)
-      } else if (result.isDenied) {
-        setPuntosMaquina(p => p + 1)
-        Swal.fire('Le diste 1 punto a la máquina', '', 'info')
-      }
-    })
-  }
-}, []) // 👈 vacío, para que se ejecute una sola vez al iniciar
 
 
   const reiniciarRonda = () => {
@@ -338,28 +328,6 @@ useEffect(() => {
   }
 
   // 🔥 FORZAR chequeo inicial y por si puntosMaquina cambia dinámicamente
-useEffect(() => {
-  // si la máquina ya tiene >=20 puntos al iniciar o cuando se actualiza
-  if (puntosMaquina >= 20 && !seCantoEnvido && !envidoAutoTriggeredRef.current) {
-    envidoAutoTriggeredRef.current = true
-    setSeCantoEnvido(true)
-
-    Swal.fire({
-      title: '🤖 La máquina te canta ENVIDO',
-      text: '¿Querés aceptar o rechazar?',
-      showDenyButton: true,
-      confirmButtonText: 'Aceptar',
-      denyButtonText: 'Rechazar',
-    }).then((result) => {
-      if (result.isConfirmed) {
-        setMostrarApartadoEnvido(true)
-      } else if (result.isDenied) {
-        setPuntosMaquina((p) => p + 1)
-        Swal.fire('Le diste 1 punto a la máquina', '', 'info')
-      }
-    })
-  }
-}, [puntosMaquina, seCantoEnvido])
 
   // ==================== RENDER ====================
   return (
