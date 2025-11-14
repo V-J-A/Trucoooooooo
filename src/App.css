@@ -1,0 +1,231 @@
+/* 🌌 ESTILO BASE */
+body {
+  margin: 0;
+  padding: 0;
+  background: radial-gradient(circle at center, #141414 0%, #0a0a0a 100%);
+  font-family: 'Poppins', sans-serif;
+  color: #f8f8f8;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100vh;
+}
+
+/* 🃏 CONTENEDOR PRINCIPAL */
+.juego-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 900px;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+/* 🏷️ TÍTULOS */
+.titulo-juego {
+  font-size: 2.5rem;
+  color: #d4af37;
+  text-shadow: 0 0 15px rgba(212, 175, 55, 0.4);
+  margin-bottom: 10px;
+}
+
+.texto-ronda {
+  font-size: 1.2rem;
+  color: #ffefb0;
+  margin-bottom: 25px;
+}
+
+/* 🟡 BOTÓN REPARTIR */
+.boton-repartir {
+  background: linear-gradient(135deg, #d4af37 0%, #b88a0d 100%);
+  border: none;
+  color: #121212;
+  font-weight: 600;
+  padding: 12px 30px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-bottom: 35px;
+  box-shadow: 0 0 10px rgba(212, 175, 55, 0.3);
+}
+
+.boton-repartir:hover {
+  background: linear-gradient(135deg, #e0c059 0%, #c19a18 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 0 20px rgba(212, 175, 55, 0.6);
+}
+
+/* 🧱 ZONA DE JUEGO */
+.zona-juego {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  gap: 40px;
+}
+
+/* 🔹 SECCIONES DE JUGADOR Y RIVAL */
+.zona-rival,
+.zona-jugador {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.titulo-seccion {
+  font-size: 1.3rem;
+  margin-bottom: 15px;
+}
+
+.titulo-seccion.rival {
+  color: #d4af37;
+}
+
+.titulo-seccion.jugador {
+  color: #ffeb99;
+}
+
+/* ♠️ CARTAS DEL RIVAL */
+.cartas-rival {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+}
+
+.carta-dada-vuelta {
+  width: 110px;
+  height: 160px;
+  background: linear-gradient(145deg, #1e1e1e, #0f0f0f);
+  border: 2px solid #d4af37;
+  border-radius: 10px;
+  box-shadow: 0 0 15px rgba(212, 175, 55, 0.1);
+}
+
+/* ♥️ CARTAS DEL JUGADOR */
+.cartas-jugador {
+  display: flex;
+  justify-content: center;
+  gap: 25px;
+  margin-top: 10px;
+}
+
+.carta-jugador {
+  background: linear-gradient(145deg, #d4af37, #c49a15);
+  color: #141414;
+  border: none;
+  border-radius: 10px;
+  width: 110px;
+  height: 160px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(212, 175, 55, 0.25);
+}
+
+.carta-jugador:hover {
+  transform: translateY(-5px) scale(1.05);
+  box-shadow: 0 8px 25px rgba(212, 175, 55, 0.45);
+}
+
+/* 🪄 ZONA DE CARTAS TIRADAS */
+.zona-cartas-tiradas {
+  margin-top: 50px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  width: 100%;
+  max-width: 900px;
+}
+
+.cartas-tiradas {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 0 25px rgba(212, 175, 55, 0.1);
+}
+
+.contenedor-cartas {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.carta.tirada {
+  width: 90px;
+  height: 130px;
+  background: linear-gradient(135deg, #d4af37 0%, #b8860b 100%);
+  border-radius: 8px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: #141414;
+  font-weight: 600;
+  box-shadow: 0 0 10px rgba(212, 175, 55, 0.4);
+  transition: transform 0.3s ease;
+}
+
+.carta.tirada:hover {
+  transform: scale(1.05);
+}
+
+/* 📱 RESPONSIVE */
+@media (max-width: 768px) {
+  .carta-jugador,
+  .carta-dada-vuelta {
+    width: 90px;
+    height: 130px;
+  }
+
+  .zona-cartas-tiradas {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .titulo-juego {
+    font-size: 2rem;
+  }
+}
+
+/* 🃏 BOTÓN TRUCO E INVERSIONES */
+.boton-truco {
+  background: linear-gradient(135deg, #ff6f61 0%, #d64541 100%);
+  border: none;
+  color: #ffffff;
+  font-weight: 600;
+  padding: 12px 30px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-bottom: 35px;
+  box-shadow: 0 0 10px rgba(255, 111, 97, 0.3);
+}
+
+.boton-truco:hover {
+  background: linear-gradient(135deg, #ff8a75 0%, #e05b57 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 0 20px rgba(255, 111, 97, 0.6);
+}
+
+/* 🃏 BOTÓN ENVIDO E INVERSIONES */
+.boton-envido {
+  background: linear-gradient(135deg, #4caf50 0%, #388e
+3c 100%);
+  border: none;
+  color: #ffffff;
+  font-weight: 600;
+  padding: 12px 30px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-bottom: 35px;
+  box-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
+}
+
+.boton-envido:hover {
+  background: linear-gradient(135deg, #66bb6a 0%, #4caf50 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 0 20px rgba(76, 175, 80, 0.6);
+}
