@@ -159,14 +159,89 @@ useEffect(() => {
     title: '🤖 La máquina te canta ENVIDO',
     text: '¿Querés aceptar o rechazar?',
     showDenyButton: true,
+    showCancelButton: true,
     confirmButtonText: 'Aceptar',
     denyButtonText: 'Rechazar',
-  }).then((result) => {
+    cancelButtonText: 'Real envido (A POR TODO)'
+  }).then(async (result) => {
     if (result.isConfirmed) {
-      setMostrarApartadoEnvido(true)
+      // Aceptar -> mostrar opciones: verdadero / mentir / real (la UI que ya tenías)
+      Swal.fire({
+        title: '¿Qué querés hacer?',
+        showDenyButton: true,
+        showCancelButton: true,
+        showConfirmButton: false,
+        denyButtonText: '¿Que diras?',
+        cancelButtonText: 'Real envido (A POR TODO)'
+      }).then(async (res) => {
+        if (res.isDenied) {
+          // Mentir (declarar) - tu lógica ya existente
+          const { value: declarado } = await Swal.fire({
+            title: 'Declarar Envido (podés mentir)',
+            input: 'number',
+            text: 'Ingresá cualquier valor del 0 al 33',
+            inputAttributes: { min: 0, max: 33, step: 1 },
+          })
+          if (declarado === undefined || declarado === null) return
+          const declaradoNum = Math.max(0, Math.min(33, parseInt(declarado, 10) || 0))
+          const realJugador = calcularEnvido(cartasJugador)
+          const envidoMaquina = calcularEnvido(cartasComputadora)
+          const azar = Math.floor(Math.random() * 5) + 1
+          if (declaradoNum !== realJugador && azar === 2) {
+            Swal.fire('🤖 La máquina te descubrió. Gana 2 puntos.')
+            cargarPuntos('maquina', 2)
+            verificarGanadorPartida()
+            return
+          }
+          if (declaradoNum > envidoMaquina) {
+            Swal.fire(`Ganaste declarando ${declaradoNum}. +2 pts`)
+            cargarPuntos('jugador', 2)
+          } else {
+            Swal.fire(`La máquina gana (${envidoMaquina} vs ${declaradoNum}). +2 pts`)
+            cargarPuntos('maquina', 2)
+          }
+          verificarGanadorPartida()
+          return
+        }
+        // aquí podés mantener el caso res.isConfirmed (decir verdadero) si lo tenés en otra parte
+      })
     } else if (result.isDenied) {
-      setPuntosMaquina((p) => p + 1)
-      Swal.fire('Le diste 1 punto a la máquina', '', 'info')
+      // Rechazo -> la máquina gana 2
+      Swal.fire('🤖 La máquina gana 2 puntos por tu rechazo.')
+      cargarPuntos('maquina', 2)
+      verificarGanadorPartida()
+    } else if (result.dismiss === Swal.DismissReason.cancel) {
+      // CANCEL = Real Envido -> ejecutar flujo igual que "mentir" pero con 4 puntos
+      // setear valor de ronda a 4 para este envido
+      setPuntosALaRonda(4)
+      // pedir declarado (puede mentir también)
+      const { value: declaradoReal } = await Swal.fire({
+        title: 'Real Envido - Declará tus puntos',
+        input: 'number',
+        inputAttributes: { min: 0, max: 33, step: 1 },
+        text: 'Real Envido vale 4 puntos. Podés declarar cualquier número (0-33).',
+        showCancelButton: true
+      })
+      if (declaradoReal === undefined || declaradoReal === null) return
+      const declaradoNum = Math.max(0, Math.min(33, parseInt(declaradoReal, 10) || 0))
+      const realJugador = calcularEnvido(cartasJugador)
+      const envidoMaquina = calcularEnvido(cartasComputadora)
+      const descubierto = Math.random() < 0.2
+      if (declaradoNum !== realJugador && descubierto) {
+        await Swal.fire('🤖 Te descubrieron en el Real Envido. La máquina gana 4 puntos.')
+        cargarPuntos('maquina', 4)
+        verificarGanadorPartida()
+        return
+      }
+      if (declaradoNum > envidoMaquina) {
+        await Swal.fire(`🃏 Ganaste el Real Envido declarando ${declaradoNum}. +4 pts`)
+        cargarPuntos('jugador', 4)
+      } else {
+        await Swal.fire(`🤖 La máquina gana el Real Envido (${envidoMaquina} vs ${declaradoNum}). +4 pts`)
+        cargarPuntos('maquina', 4)
+      }
+      verificarGanadorPartida()
+      return
     }
   })
 }, [
