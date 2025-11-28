@@ -415,7 +415,7 @@ useEffect(() => {
   />
 )}
 
-      <h1 className="titulo-juego">Juego Fácil</h1>
+      <h1 className="titulo-juego">Juego Medio</h1>
       <h2>Truco con cartas de blackjack</h2>
 
       <p>Ronda {ronda}</p>
