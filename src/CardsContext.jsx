@@ -19,11 +19,11 @@ export function CardsProvider({ children }) {
     if (valor === "7" && p === "oro") return 11
     if (valor === "3") return 10
     if (valor === "2") return 9
-    if (valor === "ACE") return 8
+    if (valor === "ACE" && p === "basto" || "oro") return 8
     if (valor === "KING") return 7
     if (valor === "QUEEN") return 6
     if (valor === "10") return 5
-    if (valor === "7") return 4
+    if (valor === "7" && p === "basto" || "oro") return 4
     if (valor === "6") return 3
     if (valor === "5") return 2
     if (valor === "4") return 1
