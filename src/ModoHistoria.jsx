@@ -17,14 +17,12 @@ export default function ModoHistoria() {
             “Bienvenido, muchacho. Te voy a enseñar el arte del truco. 
             Prestá atención, que esto no es solo suerte: es picardía y sangre fría.”
           </p>
-          <button onClick={() => setPaso(2)}>Comenzar Partida Guiada</button>
+          {/* Cambié a navegar desde el evento del botón */}
+          <button onClick={() => navigate('/Juego/historia/facil')}>Comenzar Partida Guiada</button>
         </div>
       )}
 
-      {/* Paso 2: Partida guiada */}
-      {paso === 2 && (
-        navigate('/Juego/historia/facil')
-      )}
+      {/* removí el navigate(...) ejecutado directamente en render */}
     </div>
   )
 }

@@ -1,4 +1,3 @@
-// ...existing code...
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
@@ -12,6 +11,10 @@ import './index.css'
 import { CardsProvider } from './CardsContext'
 import MenuPrincipal from './MenuPrincipal'
 import JuegoFacilHistoria from './JuegoFacilHistoria'
+import JuegoMedioHistoria from './JuegoMedioHistoria'
+import JuegoDificilHistoria from './JuegoDificilHistoria'
+import JuegoGauchoHistoria from './JuegoGauchoHistoria'
+import Agradecimiento from './Agradecimiento'
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
@@ -26,6 +29,9 @@ createRoot(document.getElementById('root')).render(
           <Route path="/Juego/gaucho" element={<JuegoGaucho />} />
           <Route path="/Juego/historia" element={<ModoHistoria />} /> {/* 👈 nueva ruta */}
           <Route path="/Juego/historia/facil" element={<JuegoFacilHistoria />} />
+          <Route path="/Juego/historia/medio" element={<JuegoMedioHistoria />} />
+          <Route path="/Juego/historia/dificil" element={<JuegoDificilHistoria />} />
+          <Route path="/Juego/historia/gaucho" element={<JuegoGauchoHistoria />} />
         </Routes>
       </BrowserRouter>
     </CardsProvider>

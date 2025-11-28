@@ -4,6 +4,8 @@ const CardsContext = createContext(null)
 
 export function CardsProvider({ children }) {
   const [cartas, setCartas] = useState([])
+  const [cartasFuertes, setCartasFuertes] = useState([])
+
 
   const asignarValorTruco = (carta) => {
     const valor = carta.value
@@ -39,12 +41,15 @@ export function CardsProvider({ children }) {
         })
         const cartasConValor = cartasFiltradas.map(c => ({ ...c, trucoValor: asignarValorTruco(c) }))
         setCartas(cartasConValor)
+        const soloFuertes = cartasConValor.filter(c => c.trucoValor > 7)
+        setCartasFuertes(soloFuertes)
       })
       .catch(console.error)
   }, [])
 
   return (
-    <CardsContext.Provider value={{ cartas, setCartas }}>
+    <CardsContext.Provider value={{ cartas, cartasFuertes, setCartas }}>
+
       {children}
     </CardsContext.Provider>
   )

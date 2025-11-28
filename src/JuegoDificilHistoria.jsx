@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import Swal from 'sweetalert2'
 import { useCards } from './CardsContext'
+import { Navigate } from 'react-router-dom'
 
 // ==================== CONFIGURACIÓN Y AYUDAS ====================
 
@@ -77,10 +78,8 @@ const decir = (cat, sub) => {
     return arr[Math.floor(Math.random() * arr.length)]
 }
 
-export default function JuegoGaucho() {
+export default function JuegoDificilHistoria() {
   const { cartas } = useCards()
-  const { cartasFuertes } = useCards()
-
 
   // --- ESTADOS DE FLUJO ---
   const [empezoLaPartida, setEmpezoLaPartida] = useState(false)
@@ -112,7 +111,7 @@ export default function JuegoGaucho() {
   // --- CONTROL DE SEGURIDAD (ANTIDOBLE TIRO) ---
   const ultimoTurnoProcesado = useRef(null) 
 
-  const PUNTOS_PARA_GANAR = 15
+  const PUNTOS_PARA_GANAR = 10
 
   // ==================== 1. MOTOR DE IA (CEREBRO Y TURNOS) ====================
 
@@ -432,18 +431,23 @@ export default function JuegoGaucho() {
   const cargarPuntos = (ganador, pts) => ganador === 'jugador' ? setPuntosJugador(p=>p+pts) : setPuntosMaquina(p=>p+pts)
   
   const verificarGanadorPartida = () => {
-      if (puntosJugador >= PUNTOS_PARA_GANAR) { Swal.fire('🏆 GANASTE EL PARTIDO'); reset(); return true }
+      if (puntosJugador >= PUNTOS_PARA_GANAR) { Swal.fire('🏆 GANASTE EL PARTIDO'); pasarDificultad(); return true }
       if (puntosMaquina >= PUNTOS_PARA_GANAR) { Swal.fire('💀 PERDISTE EL PARTIDO'); reset(); return true }
       return false
   }
 
   const reset = () => {
-      setPuntosJugador(0); setPuntosMaquina(0); setEmpezoLaPartida(false); setRonda(1)
-      setCartasJugador([]); setCartasComputadora([]); setCartasTiradasJugador([]); setCartasTiradasRival([])
-      setManosGanadasJugador(0); setManosGanadasMaquina(0); setSeCantoEnvido(false); setTrucoActivo(false)
-      setBloqueoGeneral(false); setPensandoIA(false); setPuntosALaRonda(1)
+    setEmpezoLaPartida(false); setBloqueoGeneral(false); setPensandoIA(false)
+    setTurnoActual(0); setOrdenTiradas([]); setQuienEmpieza('maquina'); setRonda(1)
+    setCartasJugador([]); setCartasComputadora([]); setCartasTiradasJugador([]); setCartasTiradasRival([])
+    setPuntosJugador(0); setPuntosMaquina(0); setManosGanadasJugador(0); setManosGanadasMaquina(0)
+    setSeCantoEnvido(false); setTrucoActivo(false); setPuntosALaRonda(1)
+    ultimoTurnoProcesado.current = null
   }
   
+  const pasarDificultad = () => {
+    Navigate('/Juego/historia/gaucho')
+  }
   const reiniciarRonda = () => {
       if (verificarGanadorPartida()) return
       setRonda(r => r + 1); setEmpezoLaPartida(false); setBloqueoGeneral(false); setPensandoIA(false)
@@ -454,8 +458,7 @@ export default function JuegoGaucho() {
   const repartir = () => {
       if (!cartas || cartas.length < 6) return
       const mazo = [...cartas].sort(() => Math.random() - 0.5)
-      const mazoFuertes = [...cartasFuertes].sort(() => Math.random() - 0.5)
-      setCartasJugador(mazo.slice(0,3)); setCartasComputadora(mazoFuertes.slice(0,3))
+      setCartasJugador(mazo.slice(0,3)); setCartasComputadora(mazo.slice(3,6))
       setEmpezoLaPartida(true); setTurnoActual(0)
       setCartasTiradasJugador([]); setCartasTiradasRival([]); setManosGanadasJugador(0); setManosGanadasMaquina(0)
       const orden = quienEmpieza === 'maquina' ? ['maquina', 'jugador'] : ['jugador', 'maquina']
@@ -469,8 +472,8 @@ export default function JuegoGaucho() {
 
   return (
     <div className="juego-container" style={{ textAlign: 'center', fontFamily: 'Arial, sans-serif' }}>
-      <h1>TRUCO DEFINITIVO</h1>
-      <div style={{ background: '#980000ff', padding: 15, margin: '10px auto', maxWidth: 600, display: 'flex', justifyContent: 'space-between', borderRadius: 8 }}>
+      <h1>TRUCO DIFICIL</h1>
+      <div style={{ background: '#91ff00ff', padding: 15, margin: '10px auto', maxWidth: 600, display: 'flex', justifyContent: 'space-between', borderRadius: 8 }}>
           <div>Vos: <strong>{puntosJugador}</strong></div>
           <div>Ronda: {ronda} | Valor: {puntosALaRonda}</div>
           <div>Máquina: <strong>{puntosMaquina}</strong></div>

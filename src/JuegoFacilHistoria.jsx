@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import Swal from 'sweetalert2'
 import { useCards } from './CardsContext'
+import { useNavigate } from 'react-router-dom'
 
 export default function JuegoFacilHistoria() {
   const { cartas } = useCards()
+  const navigate = useNavigate()
 
   // Estados básicos del juego
   const [empezoLaPartida, setEmpezoLaPartida] = useState(false)
@@ -21,7 +23,7 @@ export default function JuegoFacilHistoria() {
   // Puntos y constantes
   const [puntosJugador, setPuntosJugador] = useState(0)
   const [puntosMaquina, setPuntosMaquina] = useState(0)
-  const PUNTOS_PARA_GANAR = 15
+  const PUNTOS_PARA_GANAR = 3
 
   // Valores por ronda / truco
   const [puntosALaRonda, setPuntosALaRonda] = useState(1)
@@ -46,10 +48,12 @@ export default function JuegoFacilHistoria() {
   const verificarGanadorPartida = () => {
     if (puntosJugador >= PUNTOS_PARA_GANAR) {
       Swal.fire('🎉 ¡Felicidades! ¡Ganaste la partida!')
-      pasasteElTutorial()
+      navigate('/Juego/historia/medio')
     } else if (puntosMaquina >= PUNTOS_PARA_GANAR) {
       Swal.fire('Tranqulo muchacho. ¡Lo lograras la próxima vez!')
-      navigate('/Juego/historia/medio')
+      pasasteElTutorial()
+      // ahora sí hay `navigate` disponible
+      
     }
   }
 
@@ -64,10 +68,8 @@ export default function JuegoFacilHistoria() {
   const resetJuegoCompleto = () => {
     setPuntosJugador(0)
     setPuntosMaquina(0)
-    setEmpezoLaPartida(false)
     setRonda(1)
-    setCartasJugador([])
-    setCartasComputadora([])
+    setEmpezoLaPartida(false)
     setCartasTiradasJugador([])
     setCartasTiradasRival([])
     setManosGanadasJugador(0)
@@ -76,6 +78,8 @@ export default function JuegoFacilHistoria() {
     setPuntosALaRonda(1)
     setBloquearMaquina(false)
     setSeCantoEnvido(false)
+    // opcional: si necesitas redirigir en ciertas condiciones
+    // navigate('/Juego/historia/medio')
   }
 
   const generarOrden = (primero) => {

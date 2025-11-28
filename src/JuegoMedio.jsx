@@ -144,7 +144,7 @@ useEffect(() => {
     empezoLaPartida
 
   const debeCantar =
-    puntosMaquina >= 0 &&
+    puntosMaquina >= 28 &&
     tieneCartasRepartidas &&
     !seCantoEnvido &&
     !envidoAutoTriggeredRef.current
@@ -169,7 +169,7 @@ useEffect(() => {
       Swal.fire({
         title: '¿Qué querés hacer?',
         showDenyButton: true,
-        showCancelButton: true,
+        showCancelButton: false,
         showConfirmButton: false,
         denyButtonText: '¿Que diras?',
         cancelButtonText: 'Real envido (A POR TODO)'
@@ -206,9 +206,9 @@ useEffect(() => {
         // aquí podés mantener el caso res.isConfirmed (decir verdadero) si lo tenés en otra parte
       })
     } else if (result.isDenied) {
-      // Rechazo -> la máquina gana 2
-      Swal.fire('🤖 La máquina gana 2 puntos por tu rechazo.')
-      cargarPuntos('maquina', 2)
+      // Rechazo -> la máquina gana 1
+      Swal.fire('🤖 La máquina gana 1 puntos por tu rechazo.')
+      cargarPuntos('maquina', 1)
       verificarGanadorPartida()
     } else if (result.dismiss === Swal.DismissReason.cancel) {
       // CANCEL = Real Envido -> ejecutar flujo igual que "mentir" pero con 4 puntos
@@ -220,7 +220,7 @@ useEffect(() => {
         input: 'number',
         inputAttributes: { min: 0, max: 33, step: 1 },
         text: 'Real Envido vale 4 puntos. Podés declarar cualquier número (0-33).',
-        showCancelButton: true
+        showCancelButton: false
       })
       if (declaradoReal === undefined || declaradoReal === null) return
       const declaradoNum = Math.max(0, Math.min(33, parseInt(declaradoReal, 10) || 0))

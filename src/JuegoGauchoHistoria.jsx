@@ -77,7 +77,7 @@ const decir = (cat, sub) => {
     return arr[Math.floor(Math.random() * arr.length)]
 }
 
-export default function JuegoGaucho() {
+export default function JuegoGauchoHistoria() {
   const { cartas } = useCards()
   const { cartasFuertes } = useCards()
 
@@ -432,18 +432,23 @@ export default function JuegoGaucho() {
   const cargarPuntos = (ganador, pts) => ganador === 'jugador' ? setPuntosJugador(p=>p+pts) : setPuntosMaquina(p=>p+pts)
   
   const verificarGanadorPartida = () => {
-      if (puntosJugador >= PUNTOS_PARA_GANAR) { Swal.fire('🏆 GANASTE EL PARTIDO'); reset(); return true }
+      if (puntosJugador >= PUNTOS_PARA_GANAR) { Swal.fire('🏆 GANASTE EL PARTIDO'); finalmente(); return true }
       if (puntosMaquina >= PUNTOS_PARA_GANAR) { Swal.fire('💀 PERDISTE EL PARTIDO'); reset(); return true }
       return false
   }
 
   const reset = () => {
-      setPuntosJugador(0); setPuntosMaquina(0); setEmpezoLaPartida(false); setRonda(1)
-      setCartasJugador([]); setCartasComputadora([]); setCartasTiradasJugador([]); setCartasTiradasRival([])
-      setManosGanadasJugador(0); setManosGanadasMaquina(0); setSeCantoEnvido(false); setTrucoActivo(false)
-      setBloqueoGeneral(false); setPensandoIA(false); setPuntosALaRonda(1)
+    setEmpezoLaPartida(false); setBloqueoGeneral(false); setPensandoIA(false)
+    setTurnoActual(0); setOrdenTiradas([]); setQuienEmpieza('maquina'); setRonda(1)
+    setCartasJugador([]); setCartasComputadora([]); setCartasTiradasJugador([]); setCartasTiradasRival([])
+    setPuntosJugador(0); setPuntosMaquina(0); setManosGanadasJugador(0); setManosGanadasMaquina(0)
+    setSeCantoEnvido(false); setTrucoActivo(false); setPuntosALaRonda(1);
+    ultimoTurnoProcesado.current = null
   }
   
+  const finalmente = () => {
+    Navigate('/Agradecimiento') // Redirigir a final
+  }
   const reiniciarRonda = () => {
       if (verificarGanadorPartida()) return
       setRonda(r => r + 1); setEmpezoLaPartida(false); setBloqueoGeneral(false); setPensandoIA(false)

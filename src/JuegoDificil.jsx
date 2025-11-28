@@ -1,458 +1,515 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import Swal from 'sweetalert2'
 import { useCards } from './CardsContext'
+
+// ==================== CONFIGURACIÓN Y AYUDAS ====================
+
+const esperar = (min, max = null) => {
+  const tiempo = max ? Math.floor(Math.random() * (max - min + 1)) + min : min
+  return new Promise(resolve => setTimeout(resolve, tiempo))
+}
+
+const obtenerFuerzaCarta = (carta) => {
+  if (!carta || !carta.code) return 0
+  const v = carta.code.substring(0, carta.code.length - 1)
+  const p = carta.code.slice(-1)
+
+  if (v === '1' && p === 'S') return 14
+  if (v === '1' && p === 'C') return 13
+  if (v === '7' && p === 'S') return 12
+  if (v === '7' && p === 'D') return 11
+  if (v === '3') return 10
+  if (v === '2') return 9
+  if (v === '1') return 8
+  if (v === '12') return 7
+  if (v === '11') return 6
+  if (v === '10') return 5
+  if (v === '7') return 4
+  if (v === '6') return 3
+  if (v === '5') return 2
+  return 1
+}
+
+const calcularPuntosEnvido = (cartas) => {
+  const valores = cartas.map(c => {
+    let v = parseInt(c.value)
+    if (isNaN(v)) {
+        if (c.value === "ACE") v = 1
+        else if (["KING", "QUEEN", "JACK"].includes(c.value)) v = 10 
+        else v = 0
+    }
+    return (v >= 10) ? 0 : v
+  })
+  let max = 0, par = false
+  for (let i = 0; i < cartas.length; i++) {
+    for (let j = i + 1; j < cartas.length; j++) {
+      if (cartas[i].suit === cartas[j].suit) {
+        const suma = valores[i] + valores[j] + 20
+        if (suma > max) max = suma
+        par = true
+      }
+    }
+  }
+  if (!par) max = Math.max(...valores)
+  return max
+}
+
+// Frases
+const FRASES = {
+    envido: {
+      agresivo: ["¡Envido!", "¡Envido, carajo!", "Cantemos Envido."],
+      dudoso: ["Mmm... Envido.", "Envido.", "A ver... Envido."],
+      real: ["¡Real Envido!", "¡Real Envido, papá!", "Se agranda... Real Envido."],
+      aceptar: ["¡Quiero!", "Venga, quiero.", "Sí, dale."],
+      rechazar: ["No quiero.", "Paso.", "No llego... no quiero."]
+    },
+    truco: {
+      cantar: ["¡Truco!", "¿Jugamos? ¡Truco!", "¡Truco!"],
+      agresivo: ["¡TRUCO!", "¡Te canto TRUCO!", "¡Truco y a otra cosa!"],
+      retruco: ["¡Quiero Retruco!", "¡No, Retruco!", "¡Retruco!"],
+      vale4: ["¡Quiero Vale Cuatro!", "¡Vale Cuatro!"],
+      aceptar: ["¡Quiero!", "Venga.", "Dale, jugá."],
+      rechazar: ["No quiero.", "Me voy al mazo.", "Paso."]
+    }
+}
+const decir = (cat, sub) => {
+    const arr = FRASES[cat][sub]
+    return arr[Math.floor(Math.random() * arr.length)]
+}
 
 export default function JuegoDificil() {
   const { cartas } = useCards()
 
-  // Estados básicos del juego (los mismos que venías usando)
+  // --- ESTADOS DE FLUJO ---
   const [empezoLaPartida, setEmpezoLaPartida] = useState(false)
-  const [turnoActual, setTurnoActual] = useState(0)
-  const [ordenTiradas, setOrdenTiradas] = useState([])
+  const [bloqueoGeneral, setBloqueoGeneral] = useState(false) // Bloquea TODO (resolución manos)
+  const [pensandoIA, setPensandoIA] = useState(false) // Bloquea solo por pensamiento
+  
+  // --- ESTADOS DE JUEGO ---
+  const [turnoActual, setTurnoActual] = useState(0) // 0 o 1 (índice del array orden)
+  const [ordenTiradas, setOrdenTiradas] = useState([]) // ['jugador', 'maquina'] o viceversa
+  const [quienEmpieza, setQuienEmpieza] = useState('maquina')
+  const [ronda, setRonda] = useState(1)
+
+  // --- CARTAS ---
   const [cartasJugador, setCartasJugador] = useState([])
   const [cartasComputadora, setCartasComputadora] = useState([])
   const [cartasTiradasJugador, setCartasTiradasJugador] = useState([])
   const [cartasTiradasRival, setCartasTiradasRival] = useState([])
-  const [ronda, setRonda] = useState(1)
-  const [quienEmpieza, setQuienEmpieza] = useState('maquina')
-  const [bloquearMaquina, setBloquearMaquina] = useState(false)
-  const [seCantoEnvido, setSeCantoEnvido] = useState(false)
 
-  // Puntos y constantes
+  // --- PUNTOS Y CANTOS ---
   const [puntosJugador, setPuntosJugador] = useState(0)
   const [puntosMaquina, setPuntosMaquina] = useState(0)
-  const PUNTOS_PARA_GANAR = 15
-
-  // Valores por ronda / truco
-  const [puntosALaRonda, setPuntosALaRonda] = useState(1) // base = 1 (sin truco)
-  const [trucoActivo, setTrucoActivo] = useState(false) // si se cantó truco
-
-  // Estados para envido
-  const [envidoDeclaradoJugador, setEnvidoDeclaradoJugador] = useState(null)
-  const [envidoRealJugador, setEnvidoRealJugador] = useState(null)
-
-  // Contadores de manos ganadas (para decidir el truco)
   const [manosGanadasJugador, setManosGanadasJugador] = useState(0)
   const [manosGanadasMaquina, setManosGanadasMaquina] = useState(0)
+  
+  const [seCantoEnvido, setSeCantoEnvido] = useState(false)
+  const [trucoActivo, setTrucoActivo] = useState(false)
+  const [puntosALaRonda, setPuntosALaRonda] = useState(1)
 
-  const imagenAtras = "https://deckofcardsapi.com/static/img/back.png"
+  // --- CONTROL DE SEGURIDAD (ANTIDOBLE TIRO) ---
+  const ultimoTurnoProcesado = useRef(null) 
 
-  // ---------- FUNCIONES UTILES ----------
+  const PUNTOS_PARA_GANAR = 15
 
-  // Suma puntos al ganador y verifica si terminó la partida a PUNTOS_PARA_GANAR
-  const cargarPuntos = (ganador, puntos) => {
-    if (ganador === 'jugador') {
-      setPuntosJugador((prev) => prev + puntos)
-    } else if (ganador === 'maquina') {
-      setPuntosMaquina((prev) => prev + puntos)
-    }
-  }
+  // ==================== 1. MOTOR DE IA (CEREBRO Y TURNOS) ====================
 
-  const verificarGanadorPartida = () => {
-    if (puntosJugador >= PUNTOS_PARA_GANAR) {
-      Swal.fire('🎉 ¡Felicidades! ¡Ganaste la partida!')
-      // Reiniciar todo para comenzar otra partida limpia
-      resetJuegoCompleto()
-    } else if (puntosMaquina >= PUNTOS_PARA_GANAR) {
-      Swal.fire('🤖 La máquina ha ganado la partida. ¡Mejor suerte la próxima vez!')
-      resetJuegoCompleto()
-    }
-  }
-
-  const resetJuegoCompleto = () => {
-    setPuntosJugador(0)
-    setPuntosMaquina(0)
-    setEmpezoLaPartida(false)
-    setRonda(1)
-    setCartasJugador([])
-    setCartasComputadora([])
-    setCartasTiradasJugador([])
-    setCartasTiradasRival([])
-    setManosGanadasJugador(0)
-    setManosGanadasMaquina(0)
-    setTrucoActivo(false)
-    setPuntosALaRonda(1)
-    setBloquearMaquina(false)
-    setSeCantoEnvido(false)
-  }
-
-  // Genera orden según quien empiece (mantuvimos tu función)
-  const generarOrden = (primero) => {
-    return primero === 'maquina' ? ['maquina', 'jugador'] : ['jugador', 'maquina']
-  }
-
-  // ---------- REPARTO Y CONTROL DE TURNOS ----------
-
-  const repartirCartas = () => {
-    if (!cartas || cartas.length < 6) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: 'Las cartas no están disponibles todavía. Esperá unos segundos y recargá la página.',
-      })
-      return
-    }
-
-    if (!empezoLaPartida) {
-      const cartasBarajadas = [...cartas].sort(() => Math.random() - 0.5)
-      setCartasJugador(cartasBarajadas.slice(0, 3))
-      setCartasComputadora(cartasBarajadas.slice(3, 6))
-      setEmpezoLaPartida(true)
-      setTurnoActual(0)
-      setCartasTiradasJugador([])
-      setCartasTiradasRival([])
-      setOrdenTiradas(generarOrden(quienEmpieza))
-      setManosGanadasJugador(0)
-      setManosGanadasMaquina(0)
-      setTrucoActivo(false)
-      setPuntosALaRonda(1)
-      setBloquearMaquina(false)
-      Swal.fire({
-        icon: 'info',
-        title: `Comienza la ronda ${ronda}`,
-        text: `Empieza ${quienEmpieza === 'jugador' ? 'el jugador' : 'la máquina'}.`,
-      })
-    } else {
-      Swal.fire({
-        icon: 'info',
-        title: 'Atención',
-        text: 'Ya se repartieron las cartas para esta ronda.',
-      })
-    }
-  }
-
-  const avanzarTurno = () => {
-    // si ordenTiradas está vacío protegemos
-    if (!ordenTiradas || ordenTiradas.length === 0) return
-    setTurnoActual((prev) => (prev + 1) % ordenTiradas.length)
-  }
-
-  // ---------- ACCIONES DE JUGAR CARTAS ----------
-
-  // La máquina tira: elige una carta (aquí simple: primera) y la pone en tiradas
-  const tirarCartaMaquina = () => {
-    const carta = cartasComputadora[0]
-    if (carta) {
-      setCartasTiradasRival((prev) => [...prev, carta])
-      setCartasComputadora((prev) => prev.filter((c) => c.code !== carta.code))
-    }
-  }
-
-  // El jugador tira su carta (verifica turno)
-  const tirarCartaJugador = (carta) => {
-    const jugadorActual = ordenTiradas[turnoActual]
-    if (jugadorActual !== 'jugador') {
-      Swal.fire('⏳ No es tu turno aún.')
-      return
-    }
-    // Al tirar, guarda carta en tiradas y la quita de mano
-    setCartasTiradasJugador((prev) => [...prev, carta])
-    setCartasJugador((prev) => prev.filter((c) => c.code !== carta.code))
-    avanzarTurno()
-  }
-
-  // ---------- EFECTOS: máquina automática y sincronización ----------
-
-  // Efecto que hace que la máquina juegue cuando le toca, respetando bloqueo y orden
   useEffect(() => {
-    if (!empezoLaPartida || bloquearMaquina) return
-    if (!ordenTiradas || ordenTiradas.length === 0) return
+    // CONDICIONES ESTRICTAS PARA QUE LA IA JUEGUE
+    if (!empezoLaPartida || bloqueoGeneral || pensandoIA) return
+    if (ordenTiradas[turnoActual] !== 'maquina') return // No es su turno
+    if (cartasComputadora.length === 0) return // No tiene cartas
 
-    const jugadorActual = ordenTiradas[turnoActual]
-    if (jugadorActual === 'maquina') {
-      const timer = setTimeout(() => {
-        tirarCartaMaquina()
-        avanzarTurno()
-      }, 1000)
-      return () => clearTimeout(timer)
-    }
-  }, [turnoActual, empezoLaPartida, bloquearMaquina, ordenTiradas])
+    // --- CANDADO FÍSICO (Contar cartas en mesa) ---
+    // Si la máquina es mano (tira primero) y ya hay mas cartas suyas que tuyas, STOP.
+    if (ordenTiradas[0] === 'maquina' && cartasTiradasRival.length > cartasTiradasJugador.length) return
+    // Si el jugador es mano y tenemos la misma cantidad, me toca a mí, sino STOP.
+    // (Ej: Jugador tira (1-0), Maquina tira (1-1). Si vuelve a entrar aquí, (1-1) = STOP).
+    if (ordenTiradas[0] === 'jugador' && cartasTiradasRival.length === cartasTiradasJugador.length && cartasTiradasRival.length > 0) return // Ya tiré mi respuesta
 
-  // ---------- ENVIDO: flujo con input, mentira y descubrimiento ----------
+    // --- CANDADO LÓGICO (ID único de turno) ---
+    // Creamos un ID basado en el estado actual del juego
+    const idTurnoActual = `R${ronda}-M${manosGanadasJugador+manosGanadasMaquina}-T${turnoActual}-C${cartasComputadora.length}`
+    if (ultimoTurnoProcesado.current === idTurnoActual) return // Ya procesé este momento exacto
+    
+    ultimoTurnoProcesado.current = idTurnoActual // Marco este momento como procesado
+    ejecutarTurnoIA()
 
-const envido = async () => {
-  if (seCantoEnvido) {
-    Swal.fire('⚠️ Ya se cantó Envido en esta ronda.')
-    return
-  }
+  }, [turnoActual, ordenTiradas, empezoLaPartida, bloqueoGeneral, cartasTiradasRival.length, cartasTiradasJugador.length])
 
-  if (!empezoLaPartida) {
-    Swal.fire('⚠️ Primero repartí las cartas para iniciar la partida.')
-    return
-  }
+  const ejecutarTurnoIA = async () => {
+    setPensandoIA(true) // Activar bloqueo visual
 
-  if (cartasJugador.length < 3) {
-    Swal.fire('⚠️ No podés cantar Envido después de haber tirado cartas.')
-    return
-  }
+    try {
+        await esperar(800, 1800) // Pensamiento natural
 
-  // Marcar envido cantado
-  setSeCantoEnvido(true)
-
-  const { value: declarado } = await Swal.fire({
-    title: 'Cantar Envido',
-    text: 'Ingresá el valor que querés declarar (0-33)',
-    input: 'number',
-    inputAttributes: { min: 0, max: 33, step: 1 },
-    showCancelButton: true,
-  })
-
-  if (declarado === undefined || declarado === null || declarado === '') return
-
-  const declaradoNumero = Math.max(0, Math.min(33, parseInt(declarado, 10) || 0))
-  setEnvidoDeclaradoJugador(declaradoNumero)
-
-  const realJugador = calcularEnvido(cartasJugador)
-  setEnvidoRealJugador(realJugador)
-
-    // si el declarado es igual al real -> verdad
-    if (declaradoNumero === realJugador) {
-      // VERDAD: comparamos contra la máquina y el ganador recibe 2 puntos
-      const envidoMaquina = calcularEnvido(cartasComputadora)
-      if (realJugador > envidoMaquina) {
-        Swal.fire(`🃏 Verdadero. Ganás Envido (${realJugador} vs ${envidoMaquina}). +2 pts`)
-        // si además hay truco activo, sumamos también puntosALaRonda
-        const totalPuntos = 2 + (trucoActivo ? puntosALaRonda : 0)
-        cargarPuntos('jugador', totalPuntos)
-      } else {
-        Swal.fire(`🤖 Verdadero. La máquina gana Envido (${envidoMaquina} vs ${realJugador}). +2 pts`)
-        const totalPuntos = 2 + (trucoActivo ? puntosALaRonda : 0)
-        cargarPuntos('maquina', totalPuntos)
-      }
-    } else {
-      // MENTIRA: se tira azar (1..5). Si cae 2 -> la máquina te descubre y gana 2 pts
-      const azar = Math.floor(Math.random() * 5) + 1
-      if (azar === 2) {
-        Swal.fire('🤖 La máquina te descubrió. Gana 2 puntos.')
-        // la máquina gana 2 puntos (además, si hay truco activo sumamos puntosALaRonda)
-        const totalPuntos = 2 + (trucoActivo ? puntosALaRonda : 0)
-        cargarPuntos('maquina', totalPuntos)
-      } else {
-        // No te descubrieron: comparamos el declarado del jugador con el real de la máquina
-        const envidoMaquina = calcularEnvido(cartasComputadora)
-        // IMPORTANTE: la comparación usa el valor declarado del jugador (según tu pedido)
-        if (declaradoNumero > envidoMaquina) {
-          Swal.fire(`🃏 No te descubrieron. Tu declarado (${declaradoNumero}) vence a la máquina (${envidoMaquina}). +2 pts`)
-          const totalPuntos = 2 + (trucoActivo ? puntosALaRonda : 0)
-          cargarPuntos('jugador', totalPuntos)
-        } else {
-          Swal.fire(`🤖 No te descubrieron. La máquina (${envidoMaquina}) gana al declarado (${declaradoNumero}). +2 pts`)
-          const totalPuntos = 2 + (trucoActivo ? puntosALaRonda : 0)
-          cargarPuntos('maquina', totalPuntos)
+        // 1. ENVIDO (Solo si es primera mano y no cantado)
+        if (!seCantoEnvido && cartasComputadora.length === 3 && cartasJugador.length === 3) {
+            const decision = cerebroEnvido()
+            if (decision.cantar) {
+                await cantarEnvidoIA(decision.nivel)
+                if (verificarGanadorPartida()) { setPensandoIA(false); return } // Si terminó, salir
+            }
         }
-      }
-    }
 
-    // Después del envido no se finaliza la ronda automáticamente por envido (salvo que quieras),
-    // simplemente se actualizan puntos y se continúa el juego.
-    verificarGanadorPartida()
+        // 2. TRUCO
+        if (!trucoActivo) {
+            const decisionTruco = cerebroTruco()
+            if (decisionTruco.cantar) {
+                 const res = await cantarTrucoIA(decisionTruco.nivel)
+                 if (res === 'termino_ronda') { setPensandoIA(false); return }
+            }
+        }
+
+        // 3. JUGAR CARTA
+        await esperar(500) // Pequeña pausa pre-tiro
+        const carta = seleccionarMejorCarta()
+        
+        // Ejecución atómica
+        setCartasTiradasRival(prev => [...prev, carta])
+        setCartasComputadora(prev => prev.filter(c => c.code !== carta.code))
+        
+        // Importante: No avanzamos turno aquí manualmente con setTurnoActual
+        // El useEffect de "Resolución de Mano" detectará la carta y decidirá qué hacer.
+        
+    } catch (error) {
+        console.error("Error IA", error)
+    } finally {
+        setPensandoIA(false) // Liberar siempre
+    }
   }
 
-  // función para calcular envido (la tuya, exactamente)
-  const calcularEnvido = (cartasParam) => {
-    const valores = cartasParam.map(carta => {
-      const valor = parseInt(carta.value)
-      return isNaN(valor) ? 0 : Math.min(valor, 7)
-    })
-    let maxEnvido = 0
-    for (let i = 0; i < valores.length; i++) {
-      for (let j = i + 1; j < valores.length; j++) {
-        if (cartasParam[i].suit === cartasParam[j].suit) {
-          const envido = valores[i] + valores[j] + 20
-          if (envido > maxEnvido) {
-            maxEnvido = envido
+  // ==================== 2. RESOLUCIÓN DE MANO (ÁRBITRO) ====================
+  
+  // Este efecto vigila la mesa. Cuando ambos tiraron, resuelve.
+  useEffect(() => {
+    if (!empezoLaPartida) return
+    const cantJ = cartasTiradasJugador.length
+    const cantM = cartasTiradasRival.length
+
+    // Si no hay igualdad de cartas, significa que alguien tiró y le toca al otro.
+    // Solo avanzamos turno si NO estamos resolviendo una mano completa.
+    if (cantJ !== cantM) {
+        // Ejemplo: Empieza Maquina. Tira (0,1). Turno actual es 0. 
+        // Ahora debe ser 1 (Jugador).
+        // Pero OJO: Si Maquina tiró, `cantM` > `cantJ`.
+        
+        // Calculamos a quién le toca matemáticamente
+        // Si orden[0] es Maquina:
+        // M: 1, J: 0 -> Toca J (índice 1)
+        // M: 1, J: 1 -> Resolviendo...
+        
+        const totalCartas = cantJ + cantM
+        const nuevoTurno = totalCartas % 2 
+        
+        // Solo actualizamos si difiere, para evitar renders innecesarios
+        if (turnoActual !== nuevoTurno && cantJ !== cantM) {
+            setTurnoActual(nuevoTurno)
+        }
+        return 
+    }
+
+    // SI LLEGAMOS ACÁ, cantJ === cantM y > 0. AMBOS TIRARON.
+    if (cantJ === 0) return 
+
+    // BLOQUEAMOS TODO PARA RESOLVER
+    setBloqueoGeneral(true)
+
+    const resolver = async () => {
+        await esperar(800) // Suspenso viendo las cartas
+
+        const uJ = cartasTiradasJugador[cantJ - 1]
+        const uM = cartasTiradasRival[cantM - 1]
+        
+        const fJ = obtenerFuerzaCarta(uJ)
+        const fM = obtenerFuerzaCarta(uM)
+        
+        let ganaMano = 'parda'
+        if (fJ > fM) ganaMano = 'jugador'
+        else if (fM > fJ) ganaMano = 'maquina'
+        else ganaMano = quienEmpieza // En parda gana el mano
+
+        // Actualizar contadores
+        if (ganaMano === 'jugador') setManosGanadasJugador(p => p + 1)
+        else setManosGanadasMaquina(p => p + 1)
+
+        // Chequear si terminó la ronda
+        const mj = manosGanadasJugador + (ganaMano === 'jugador' ? 1 : 0)
+        const mm = manosGanadasMaquina + (ganaMano === 'maquina' ? 1 : 0)
+
+        if (mj >= 2 || mm >= 2) {
+             // FIN DE RONDA
+             const ganadorRonda = mj >= 2 ? 'jugador' : 'maquina'
+             await Swal.fire({
+                 title: ganadorRonda === 'jugador' ? '👏 Ganaste la ronda' : '💀 Perdiste la ronda',
+                 text: `Suman ${puntosALaRonda} puntos`,
+                 timer: 1500, showConfirmButton: false
+             })
+             cargarPuntos(ganadorRonda, puntosALaRonda)
+             reiniciarRonda()
+        } else {
+             // SIGUE LA RONDA
+             // El que ganó tira primero (es índice 0 del nuevo orden)
+             setQuienEmpieza(ganaMano) // Para saber quien es mano en sig parda
+             setOrdenTiradas(ganaMano === 'maquina' ? ['maquina', 'jugador'] : ['jugador', 'maquina'])
+             setTurnoActual(0) // El ganador siempre tira primero (índice 0)
+             
+             // Desbloqueamos para que juegue
+             setBloqueoGeneral(false)
+        }
+    }
+    resolver()
+
+  }, [cartasTiradasJugador, cartasTiradasRival]) // Se dispara cuando cambian las cartas en mesa
+
+  // ==================== 3. CEREBROS Y LÓGICA ====================
+
+  const obtenerEstadoAnimico = () => {
+    let animo = 50
+    if (puntosMaquina > puntosJugador) animo += 15
+    if (manosGanadasMaquina > manosGanadasJugador) animo += 15
+    if (puntosMaquina < 5 && puntosJugador > 10) animo -= 20
+    return Math.max(0, Math.min(100, animo))
+  }
+
+  const cerebroEnvido = () => {
+      const ptos = calcularPuntosEnvido(cartasComputadora)
+      const animo = obtenerEstadoAnimico()
+      const umbral = animo > 70 ? 26 : 28 // Si está feliz arriesga más
+      const mentira = Math.random() < 0.15 && ptos < 20
+      
+      if (ptos >= umbral || mentira) return { cantar: true, nivel: ptos > 30 ? 'agresivo' : 'dudoso' }
+      return { cantar: false }
+  }
+
+  const cerebroTruco = () => {
+      const fuerza = cartasComputadora.reduce((acc, c) => acc + obtenerFuerzaCarta(c), 0)
+      const animo = obtenerEstadoAnimico()
+      const ganoPrimera = manosGanadasMaquina === 1 && manosGanadasJugador === 0
+      
+      // Si ganó primera y tiene algo decente
+      if (ganoPrimera && fuerza > 15) return { cantar: true, nivel: 'agresivo' }
+      // Si tiene mano fuerte
+      if (fuerza > 28) return { cantar: true, nivel: 'cantar' }
+      // Desesperación
+      if (animo < 30 && fuerza < 10 && Math.random() < 0.2) return { cantar: true, nivel: 'agresivo' }
+      
+      return { cantar: false }
+  }
+
+  const seleccionarMejorCarta = () => {
+      const ordenadas = [...cartasComputadora].sort((a,b) => obtenerFuerzaCarta(b) - obtenerFuerzaCarta(a))
+      
+      // Si soy mano, tiro la más alta para asegurar (simple)
+      if (cartasTiradasJugador.length === cartasTiradasRival.length) return ordenadas[0]
+
+      // Si respondo
+      const rival = cartasTiradasJugador[cartasTiradasJugador.length - 1]
+      const fRival = obtenerFuerzaCarta(rival)
+      
+      // Buscar la carta más chica que le gane
+      const ganadoras = ordenadas.filter(c => obtenerFuerzaCarta(c) > fRival)
+      // Si tengo ganadoras, tiro la peor de ellas (la última del array filtrado) para guardar las altas
+      if (ganadoras.length > 0) return ganadoras[ganadoras.length - 1]
+      
+      // Si pierdo, tiro la más chica (la última del array original)
+      return ordenadas[ordenadas.length - 1]
+  }
+
+  // ==================== 4. ACCIONES ====================
+
+  const cantarEnvidoIA = async (nivel) => {
+      setSeCantoEnvido(true)
+      const resp = await Swal.fire({
+          title: `🤖 "${decir('envido', nivel)}"`,
+          showDenyButton: true, showCancelButton: true,
+          confirmButtonText: 'Quiero', denyButtonText: 'No quiero', cancelButtonText: 'Real Envido',
+          allowOutsideClick: false
+      })
+      if (resp.isConfirmed) await resolverEnvido(2)
+      else if (resp.isDenied) { cargarPuntos('maquina', 1); Swal.fire('🤖 Gana 1 punto.') }
+      else if (resp.dismiss === Swal.DismissReason.cancel) {
+          await esperar(1500)
+          // Respuesta a Real Envido
+          const pts = calcularPuntosEnvido(cartasComputadora)
+          if (pts >= 27 || (pts > 24 && obtenerEstadoAnimico() > 60)) {
+              Swal.fire(`🤖 "${decir('envido', 'aceptar')}"`)
+              await resolverEnvido(3)
+          } else {
+              Swal.fire(`🤖 "${decir('envido', 'rechazar')}"`)
+              cargarPuntos('jugador', 2)
           }
-        }
       }
-    }
-    return maxEnvido
   }
 
-  // ---------- TRUCO: cantar y efecto en puntos por ronda ----------
-
-  const truco = () => {
-    if (!empezoLaPartida) {
-      Swal.fire('⚠️ Primero repartí las cartas para iniciar la partida.')
-      return
-    }
-    // Si ya se cantó, no hacer nada por ahora (podés escalar)
-    if (trucoActivo) {
-      Swal.fire('⚠️ El Truco ya fue cantado; si querés podés aceptar/ir al re-truco en una extensión.')
-      return
-    }
-    // Cantaron truco: ahora la ronda vale 2 (puedes ajustar escalas después)
-    setTrucoActivo(true)
-    setPuntosALaRonda(2)
-    Swal.fire(`🃏 Truco cantado! Ahora la ronda vale ${2} puntos.`)
+  const cantarTrucoIA = async (nivel) => {
+      const resp = await Swal.fire({
+          title: `🤖 "${decir('truco', nivel)}"`,
+          showDenyButton: true, showCancelButton: true,
+          confirmButtonText: 'Quiero', denyButtonText: 'No quiero', cancelButtonText: 'Re Truco',
+          allowOutsideClick: false
+      })
+      if (resp.isConfirmed) {
+          setTrucoActivo(true); setPuntosALaRonda(2); Swal.fire('🗣️ "¡Se juega!"'); return 'sigue'
+      } else if (resp.isDenied) {
+          cargarPuntos('maquina', 1); reiniciarRonda(); return 'termino_ronda'
+      } else if (resp.dismiss === Swal.DismissReason.cancel) {
+          return await responderReTrucoIA()
+      }
   }
 
-  // ---------- COMPARATIVA DE CARTAS (tu efecto) ----------
-  useEffect(() => {
-    // Solo actuamos cuando ambos tiraron la misma cantidad de cartas (1 vs 1, 2 vs 2, ...)
-    if (
-      cartasTiradasJugador.length > 0 &&
-      cartasTiradasJugador.length === cartasTiradasRival.length
-    ) {
-      const ultimaJugador = cartasTiradasJugador[cartasTiradasJugador.length - 1]
-      const ultimaRival = cartasTiradasRival[cartasTiradasRival.length - 1]
+  const responderReTrucoIA = async () => {
+      await esperar(1500)
+      const tiene3 = cartasComputadora.some(c => obtenerFuerzaCarta(c) >= 10)
+      if (tiene3 || (obtenerEstadoAnimico() > 80)) {
+          Swal.fire(`🤖 "${decir('truco', 'aceptar')}"`); setTrucoActivo(true); setPuntosALaRonda(3); return 'sigue'
+      }
+      Swal.fire(`🤖 "${decir('truco', 'rechazar')}"`); cargarPuntos('jugador', 2); reiniciarRonda(); return 'termino_ronda'
+  }
 
-      if (!ultimaJugador || !ultimaRival) return
+  // --- INTERACCIÓN JUGADOR ---
 
-      // Decidir ganadora de la mano por trucoValor (tu campo)
-      let ganadorMano = null
-      if (ultimaJugador.trucoValor > ultimaRival.trucoValor) {
-        ganadorMano = 'jugador'
-        setManosGanadasJugador((prev) => prev + 1)
-        Swal.fire('🧠 Ganaste esta comparativa (mano).')
-      } else if (ultimaJugador.trucoValor < ultimaRival.trucoValor) {
-        ganadorMano = 'maquina'
-        setManosGanadasMaquina((prev) => prev + 1)
-        Swal.fire('🤖 La máquina ganó esta comparativa (mano).')
+  const jugadorTiraCarta = (carta) => {
+      if (bloqueoGeneral || pensandoIA || ordenTiradas[turnoActual] !== 'jugador') return
+      
+      setCartasTiradasJugador(prev => [...prev, carta])
+      setCartasJugador(prev => prev.filter(c => c.code !== carta.code))
+      // No tocamos turnoActual, el useEffect de resolución lo hará.
+  }
+
+  const jugadorCantaEnvido = async () => {
+      if (bloqueoGeneral || pensandoIA) return
+      setSeCantoEnvido(true); setBloqueoGeneral(true)
+      Swal.fire({ title: '📣 ¡ENVIDO!', showConfirmButton: false, timer: 1000 })
+      await esperar(1500)
+      
+      const pts = calcularPuntosEnvido(cartasComputadora)
+      let accion = 'no_quiero'
+      if (pts > 28) accion = 'real'
+      else if (pts >= 24) accion = 'quiero'
+      
+      if (accion === 'real') {
+         const r = await Swal.fire({ title: `🤖 "${decir('envido', 'real')}"`, showDenyButton: true, confirmButtonText: 'Quiero', denyButtonText: 'No' })
+         if(r.isConfirmed) await resolverEnvido(4)
+         else cargarPuntos('maquina', 2)
+      } else if (accion === 'quiero') {
+         Swal.fire(`🤖 "${decir('envido', 'aceptar')}"`); await resolverEnvido(2)
       } else {
-        // Empate: según tus reglas, la máquina mantiene (como antes)
-        ganadorMano = 'maquina'
-        setManosGanadasMaquina((prev) => prev + 1)
-        Swal.fire('⚖️ Empate: la máquina se queda la mano.')
+         Swal.fire(`🤖 "${decir('envido', 'rechazar')}"`); cargarPuntos('jugador', 1)
       }
-
-      // Bloqueamos la máquina momentáneamente para evitar que actúe durante la re-sincronización
-      setBloquearMaquina(true)
-
-      // Después de actualizar manos, verificamos si alguien alcanzó 2 manos (fin del truco/ronda)
-      setTimeout(() => {
-        // Tomamos valores actualizados desde estado (manosGanadasX podrían estar ligeramente desfasados en closure,
-        // por seguridad leemos con funciones como desde el valor que sabe React).
-        // Para evitar problemas de lectura inmediata, recomputamos con las longitudes y contadores al momento:
-        // (aquí usamos una pequeña lectura basada en arrays y counters previos)
-        const mgJugador = manosGanadasJugador + (ganadorMano === 'jugador' ? 1 : 0)
-        const mgMaquina = manosGanadasMaquina + (ganadorMano === 'maquina' ? 1 : 0)
-
-        if (mgJugador >= 2 || mgMaquina >= 2) {
-          // Alguien ganó el truco por 2 manos: se suma puntosALaRonda al ganador y se reinicia la ronda.
-          const ganadorRonda = mgJugador >= 2 ? 'jugador' : 'maquina'
-          Swal.fire(`🏆 ${ganadorRonda === 'jugador' ? 'Ganaste' : 'La máquina ganó'} el Truco por 2 manos. +${puntosALaRonda} pts`)
-          cargarPuntos(ganadorRonda, puntosALaRonda)
-
-          // Reiniciamos la ronda (limpiamos manos tiradas y manos ganadas)
-          reiniciarRonda(ganadorRonda)
-
-        } else {
-          // Si no terminó el truco, simplemente reiniciamos para la próxima comparativa:
-          // reseteamos turno para la siguiente sub-mano y actualizamos el orden según quienEmpieza actual
-          // (NOTA: quienEmpieza se mantiene o se actualiza de acuerdo a la última comparativa — mantendremos la regla anterior:
-          // si gana jugador, empieza jugador en la siguiente comparativa; si gana la máquina, empieza máquina.)
-          const nuevoInicio = ganadorMano === 'jugador' ? 'jugador' : 'maquina'
-          setQuienEmpieza(nuevoInicio)
-          setTurnoActual(0)
-          setOrdenTiradas(generarOrden(nuevoInicio))
-
-          // desbloqueamos la máquina luego de re-sincronizar
-          setBloquearMaquina(false)
-        }
-      }, 300) // pequeño retardo para evitar race conditions
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cartasTiradasJugador, cartasTiradasRival]) // este effect solo depende de las cartas tiradas
-
-  // ---------- REINICIAR RONDA (cuando alguien ganó la ronda/truco) ----------
-  const reiniciarRonda = (ganadorRonda) => {
-    // aumentamos ronda, limpiamos manos y cartas tiradas, y preparamos siguiente reparto
-    setRonda((prev) => prev + 1)
-    setEmpezoLaPartida(false)
-    setCartasTiradasJugador([])
-    setCartasTiradasRival([])
-    setManosGanadasJugador(0)
-    setManosGanadasMaquina(0)
-    setTrucoActivo(false)
-    setPuntosALaRonda(1)
-    setBloquearMaquina(false)
-    setSeCantoEnvido(false)
-
-    // cargamos puntos (ya lo hicimos antes de llamar a reiniciarRonda, pero si quisieras hacerlo aquí:
-    // cargarPuntos(ganadorRonda, puntosALaRonda)
-
-    // Verificamos si la partida llegó a su fin por puntos acumulados
-    setTimeout(() => verificarGanadorPartida(), 200)
+      setBloqueoGeneral(false)
   }
 
-  // ---------- UI: renderizado (tu estructura conservada) ----------
+  const jugadorCantaTruco = async () => {
+      if (bloqueoGeneral || pensandoIA) return
+      if (trucoActivo) return // Aquí iría ReTruco jugador
+      setTrucoActivo(true); setBloqueoGeneral(true)
+      
+      Swal.fire({ title: '📣 ¡TRUCO!', showConfirmButton: false, timer: 1000 })
+      await esperar(1500)
+      
+      const fuerza = cartasComputadora.reduce((a,c)=>a+obtenerFuerzaCarta(c),0)
+      const acepta = fuerza > 20 || (puntosMaquina > puntosJugador)
+      
+      if (acepta) {
+          Swal.fire(`🤖 "${decir('truco', 'aceptar')}"`); setPuntosALaRonda(2); setBloqueoGeneral(false)
+      } else {
+          Swal.fire(`🤖 "${decir('truco', 'rechazar')}"`); cargarPuntos('jugador', 1); reiniciarRonda() // Termina
+      }
+  }
+
+  // --- UTILS ---
+  const resolverEnvido = async (pts) => {
+      const { value } = await Swal.fire({ title: `Por ${pts} puntos`, input: 'number', text: '¿Tus puntos?' })
+      if (!value) return
+      const pJ = parseInt(value)||0, pM = calcularPuntosEnvido(cartasComputadora)
+      if (pJ > pM) { Swal.fire(`Ganas vos (${pJ} vs ${pM})`); cargarPuntos('jugador', pts) }
+      else { Swal.fire(`Gana maquina (${pM} vs ${pJ})`); cargarPuntos('maquina', pts) }
+  }
+
+  const cargarPuntos = (ganador, pts) => ganador === 'jugador' ? setPuntosJugador(p=>p+pts) : setPuntosMaquina(p=>p+pts)
+  
+  const verificarGanadorPartida = () => {
+      if (puntosJugador >= PUNTOS_PARA_GANAR) { Swal.fire('🏆 GANASTE EL PARTIDO'); reset(); return true }
+      if (puntosMaquina >= PUNTOS_PARA_GANAR) { Swal.fire('💀 PERDISTE EL PARTIDO'); reset(); return true }
+      return false
+  }
+
+  const reset = () => {
+      setPuntosJugador(0); setPuntosMaquina(0); setEmpezoLaPartida(false); setRonda(1)
+      setCartasJugador([]); setCartasComputadora([]); setCartasTiradasJugador([]); setCartasTiradasRival([])
+      setManosGanadasJugador(0); setManosGanadasMaquina(0); setSeCantoEnvido(false); setTrucoActivo(false)
+      setBloqueoGeneral(false); setPensandoIA(false); setPuntosALaRonda(1)
+  }
+  
+  const reiniciarRonda = () => {
+      if (verificarGanadorPartida()) return
+      setRonda(r => r + 1); setEmpezoLaPartida(false); setBloqueoGeneral(false); setPensandoIA(false)
+      setCartasTiradasJugador([]); setCartasTiradasRival([]); setManosGanadasJugador(0); setManosGanadasMaquina(0)
+      setTrucoActivo(false); setPuntosALaRonda(1); setSeCantoEnvido(false); ultimoTurnoProcesado.current = null
+  }
+
+  const repartir = () => {
+      if (!cartas || cartas.length < 6) return
+      const mazo = [...cartas].sort(() => Math.random() - 0.5)
+      setCartasJugador(mazo.slice(0,3)); setCartasComputadora(mazo.slice(3,6))
+      setEmpezoLaPartida(true); setTurnoActual(0)
+      setCartasTiradasJugador([]); setCartasTiradasRival([]); setManosGanadasJugador(0); setManosGanadasMaquina(0)
+      const orden = quienEmpieza === 'maquina' ? ['maquina', 'jugador'] : ['jugador', 'maquina']
+      setOrdenTiradas(orden); setSeCantoEnvido(false); setTrucoActivo(false); setPuntosALaRonda(1)
+      setBloqueoGeneral(false); setPensandoIA(false); ultimoTurnoProcesado.current = null
+  }
+
+  // --- VISTA ---
+  const imgAtras = "https://deckofcardsapi.com/static/img/back.png"
+  const esMiTurno = !bloqueoGeneral && !pensandoIA && ordenTiradas[turnoActual] === 'jugador'
+
   return (
-    <div className="juego-container">
-      <h1 className="titulo-juego">Juego Dificil</h1>
-      <h2 className="titulo-juego">Truco con cartas de blackshack</h2>
-
-      <p>Ronda {ronda}</p>
-      <p>Puntos Jugador: {puntosJugador} | Puntos Máquina: {puntosMaquina}</p>
-      <p>Manos ganadas - Jugador: {manosGanadasJugador} | Máquina: {manosGanadasMaquina}</p>
-      <h2>Valores pasados a blackshack</h2>
-      
-      Picas = Espadas<br /> 
-      Tréboles = Bastos<br /> 
-      Diamantes = Oros<br /> 
-      Corazones = Copas<br />
-      
-      <p>Valor ronda (puntosALaRonda): {puntosALaRonda} {trucoActivo ? '(Truco activo)' : ''}</p>
-
-      <br /> 
-      <button onClick={repartirCartas}>Repartir Cartas</button>
-
-      <br />
-      <button onClick={envido}>Cantar Envido</button>
-
-      <br />
-      <button onClick={truco}>Cantar Truco</button>
-
-      <div className="zona-juego" style={{ display: 'flex', gap: 40, marginTop: 20 }}>
-        {/* Rival */}
-        <div>
-          <h3>Cartas del Rival</h3>
-          <div style={{ display: 'flex', gap: 8 }}>
-            {cartasComputadora.map((c) => (
-              <img key={c.code} src={imagenAtras} alt="espalda" style={{ width: 90 }} />
-            ))}
-          </div>
-        </div>
-
-        {/* Jugador */}
-        <div>
-          <h3>Tus Cartas</h3>
-          <div style={{ display: 'flex', gap: 8 }}>
-            {cartasJugador.map((c) => (
-              <button
-                key={c.code}
-                onClick={() => tirarCartaJugador(c)}
-                disabled={ordenTiradas[turnoActual] !== 'jugador' || bloquearMaquina}
-                style={{ padding: 0, border: 'none', background: 'transparent' }}
-              >
-                <img src={c.image} alt={c.code} style={{ width: 90, opacity: (ordenTiradas[turnoActual] !== 'jugador' || bloquearMaquina) ? 0.6 : 1 }} />
-              </button>
-            ))}
-          </div>
-        </div>
+    <div className="juego-container" style={{ textAlign: 'center', fontFamily: 'Arial, sans-serif' }}>
+      <h1>TRUCO DIFICIL</h1>
+      <div style={{ background: '#91ff00ff', padding: 15, margin: '10px auto', maxWidth: 600, display: 'flex', justifyContent: 'space-between', borderRadius: 8 }}>
+          <div>Vos: <strong>{puntosJugador}</strong></div>
+          <div>Ronda: {ronda} | Valor: {puntosALaRonda}</div>
+          <div>Máquina: <strong>{puntosMaquina}</strong></div>
       </div>
 
-      <div style={{ marginTop: 24 }}>
-        <h4>Cartas Tiradas</h4>
-        <div style={{ display: 'flex', gap: 80 }}>
+      {!empezoLaPartida ? (
+          <button onClick={repartir} style={{padding: '10px 20px', fontSize: 20}}>Repartir</button>
+      ) : (
           <div>
-            <h5>Rival</h5>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {cartasTiradasRival.map((c) => (
-                <img key={c.code} src={c.image} alt={c.code} style={{ width: 80 }} />
-              ))}
-            </div>
-          </div>
+              <div style={{marginBottom: 20}}>
+                  <button onClick={jugadorCantaEnvido} disabled={!esMiTurno || seCantoEnvido}>Envido</button>
+                  <button onClick={jugadorCantaTruco} disabled={!esMiTurno}>{trucoActivo ? 'Re Truco' : 'Truco'}</button>
+              </div>
 
-          <div>
-            <h5>Jugador</h5>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {cartasTiradasJugador.map((c) => (
-                <img key={c.code} src={c.image} alt={c.code} style={{ width: 80 }} />
-              ))}
-            </div>
+              {/* MÁQUINA */}
+              <div>
+                  <div style={{display:'flex', justifyContent:'center', gap:5}}>
+                     {cartasComputadora.map((c,i) => <img key={i} src={imgAtras} width={80} style={{borderRadius:5}}/>)}
+                  </div>
+                  <p>{pensandoIA ? '🤖 Pensando...' : (bloqueoGeneral ? '⚖️ Resolviendo...' : '🤖 Esperando...')}</p>
+              </div>
+
+              {/* MESA */}
+              <div style={{background: '#2e7d32', height: 160, margin: '20px auto', maxWidth: 600, borderRadius: 10, display:'flex', justifyContent:'space-around', alignItems:'center', border:'4px solid #1b5e20'}}>
+                  <div>{cartasTiradasRival.map(c => <img key={c.code} src={c.image} width={70} style={{margin:4}}/>)}</div>
+                  <div>{cartasTiradasJugador.map(c => <img key={c.code} src={c.image} width={70} style={{margin:4}}/>)}</div>
+              </div>
+
+              {/* JUGADOR */}
+              <div>
+                  <p>{esMiTurno ? '⚡ TU TURNO' : '✋ ESPERÁ...'}</p>
+                  <div style={{display:'flex', justifyContent:'center', gap:10}}>
+                      {cartasJugador.map(c => (
+                          <img key={c.code} src={c.image} width={100} 
+                            style={{ cursor: esMiTurno ? 'pointer' : 'not-allowed', opacity: esMiTurno ? 1 : 0.6, transition: '0.2s' }}
+                            onClick={() => jugadorTiraCarta(c)}
+                          />
+                      ))}
+                  </div>
+              </div>
           </div>
-        </div>
-      </div>
+      )}
     </div>
   )
 }
