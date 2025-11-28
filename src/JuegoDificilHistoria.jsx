@@ -420,13 +420,68 @@ export default function JuegoDificilHistoria() {
   }
 
   // --- UTILS ---
-  const resolverEnvido = async (pts) => {
-      const { value } = await Swal.fire({ title: `Por ${pts} puntos`, input: 'number', text: '¿Tus puntos?' })
-      if (!value) return
-      const pJ = parseInt(value)||0, pM = calcularPuntosEnvido(cartasComputadora)
-      if (pJ > pM) { Swal.fire(`Ganas vos (${pJ} vs ${pM})`); cargarPuntos('jugador', pts) }
-      else { Swal.fire(`Gana maquina (${pM} vs ${pJ})`); cargarPuntos('maquina', pts) }
-  }
+const resolverEnvido = async (pts) => {
+    const { value } = await Swal.fire({
+        title: `Por ${pts} puntos`,
+        input: "number",
+        text: "¿Cuántos puntos tenés?",
+        inputAttributes: { min: 0, max: 33 }
+    });
+
+    if (!value && value !== "0") return;
+
+    const pJ = parseInt(value) || 0;
+    const pM = calcularPuntosEnvido(cartasComputadora);
+    const maxJugadorReal = calcularPuntosEnvido(cartasJugador);
+
+    // ========================================
+    // PROBABILIDAD DE DETECTAR LA MENTIRA
+    // ========================================
+    const PROB_DETECTAR_MENTIRA = 0.65; // 65% detecta, 35% te cree
+    const random = Math.random(); // entre 0 y 1
+
+    // ========================================
+    // 1. DETECCCIÓN DE MENTIRA (ahora probabilística)
+    // ========================================
+    const jugadorMiente = pJ > maxJugadorReal;
+
+    if (jugadorMiente) {
+        if (random < PROB_DETECTAR_MENTIRA) {
+            // La máquina detecta que mentiste
+            await Swal.fire({
+                title: "🤖 ¡Mentiste!",
+                text: `Eso es imposible. Tu máximo real es ${maxJugadorReal}.`,
+                icon: "warning"
+            });
+
+            await Swal.fire({
+                title: "🤖 'El punto es mío por caradura.'",
+                icon: "error"
+            });
+
+            cargarPuntos("maquina", pts);
+            return;
+        } else {
+            // La máquina NO detecta tu mentira → te cree
+            await Swal.fire({
+                title: "🤖 Hm… bueno…",
+                text: "Te creo. Vamos a ver quién gana.",
+                icon: "info"
+            });
+        }
+    }
+
+    // ========================================
+    // 2. RESOLUCIÓN NORMAL DEL ENVÍDO
+    // ========================================
+    if (pJ > pM) {
+        await Swal.fire(`Ganás vos (${pJ} vs ${pM})`);
+        cargarPuntos("jugador", pts);
+    } else {
+        await Swal.fire(`Gana la máquina (${pM} vs ${pJ})`);
+        cargarPuntos("maquina", pts);
+    }
+};
 
   const cargarPuntos = (ganador, pts) => ganador === 'jugador' ? setPuntosJugador(p=>p+pts) : setPuntosMaquina(p=>p+pts)
   
@@ -448,6 +503,7 @@ export default function JuegoDificilHistoria() {
   const pasarDificultad = () => {
     Navigate('/Juego/historia/gaucho')
   }
+
   const reiniciarRonda = () => {
       if (verificarGanadorPartida()) return
       setRonda(r => r + 1); setEmpezoLaPartida(false); setBloqueoGeneral(false); setPensandoIA(false)

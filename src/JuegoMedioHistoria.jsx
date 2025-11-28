@@ -65,13 +65,10 @@ const envidoAutoTriggeredRef = useRef(false)
     setPuntosALaRonda(1)
   }
 
-  const pasasteDeDificultad = () => {
-    Navigate('/Juego/historia/dificil')
-  }
   const verificarGanadorPartida = () => {
     if (puntosJugador >= PUNTOS_PARA_GANAR) {
       Swal.fire('🎉 ¡Felicidades! ¡Ganaste la partida!')
-      pasasteDeDificultad()
+      Navigate('/Juego/historia/dificil')
     } else if (puntosMaquina >= PUNTOS_PARA_GANAR) {
       Swal.fire('🤖 La máquina ha ganado la partida. ¡Mejor suerte la próxima vez!')
       resetJuegoCompleto()
